@@ -42,10 +42,37 @@ from deluge.plugins.pluginbase import CorePluginBase
 import deluge.component as component
 import deluge.configmanager
 from deluge.core.rpcserver import export
+from HTMLParser import HTMLParser
+import urllib2
 
 DEFAULT_PREFS = {
     "test":"NiNiNi"
 }
+
+"""Parses torrentz.eu to find the announcelist"""
+class TorrentzHTMLParser(HTMLParser):
+
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.announcelist_url = "http://torrentz.eu"
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'a':
+            for name, value in attrs:
+                if name == 'href':
+                    if 'announcelist' in value:
+                        self.announcelist_url = self.announcelist_url + value
+                        log.info("Found announcelist: %s" % self.announcelist_url)
+    def get_announcelist_url(self):
+        if self.announcelist_url == "http://torrentz.eu":
+            log.info("No announcelist found")
+            raise Exception("The torrent hash doesn't exist on torrentz.eu")
+        else:
+            return self.announcelist_url
+
+
+
+
 
 class Core(CorePluginBase):
     def enable(self):
@@ -69,10 +96,27 @@ class Core(CorePluginBase):
         try:
             #log.info("torrent_id: %d" % torrent_id)
             torrent = component.get("TorrentManager").torrents[torrent_id]
-            data = torrent.get_status(["name","total_size", "trackers"])
+            data = torrent.get_status(["name","is_finished"])
+            log.info(data)
+
+            if not data["is_finished"]:
+                response = urllib2.urlopen("http://torrentz.eu/%s" % torrent_id)
+                htmlParser = TorrentzHTMLParser()
+                htmlParser.feed(response.read())
+                
+                tracker_page = urllib2.urlopen(htmlParser.get_announcelist_url()).read()
+                trackers = tracker_page.split()
+                tracker_list = []
+                for t in trackers:
+                    tracker_dict = {"tier":0}
+                    tracker_dict["url"] = t
+                    tracker_list.append(tracker_dict)
+                log.info(tracker_list)
+
+                torrent.set_trackers(tracker_list)
 
         except Exception as e:
-            log.info("error in alert %s" % e.strerror)
+            log.info(e.strerror)
 
 
    
