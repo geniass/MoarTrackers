@@ -40,14 +40,9 @@
 from deluge.log import LOG as log
 from deluge.plugins.pluginbase import CorePluginBase
 import deluge.component as component
-import deluge.configmanager
-from deluge.core.rpcserver import export
 from HTMLParser import HTMLParser
 import urllib2
 
-DEFAULT_PREFS = {
-    "test":"NiNiNi"
-}
 
 """Parses torrentz.eu to find the announcelist"""
 class TorrentzHTMLParser(HTMLParser):
@@ -56,6 +51,7 @@ class TorrentzHTMLParser(HTMLParser):
         HTMLParser.__init__(self)
         self.announcelist_url = "http://torrentz.eu"
 
+
     def handle_starttag(self, tag, attrs):
         if tag == 'a':
             for name, value in attrs:
@@ -63,6 +59,8 @@ class TorrentzHTMLParser(HTMLParser):
                     if 'announcelist' in value:
                         self.announcelist_url = self.announcelist_url + value
                         log.info("Found announcelist: %s" % self.announcelist_url)
+
+
     def get_announcelist_url(self):
         if self.announcelist_url == "http://torrentz.eu":
             log.info("No announcelist found")
@@ -71,21 +69,16 @@ class TorrentzHTMLParser(HTMLParser):
             return self.announcelist_url
 
 
-
-
-
 class Core(CorePluginBase):
     def enable(self):
-        #self.config = deluge.configmanager.ConfigManager("moartrackers.conf", DEFAULT_PREFS)
-        event_manager = component.get("EventManager")
-        event_manager.register_event_handler("TorrentAddedEvent", self.on_torrent_added_event)
+        component.get("EventManager").register_event_handler("TorrentAddedEvent", self.on_torrent_added_event)
         log.info("MoarTrackers started")
 
 
     def disable(self):
         log.info("Stopping MoarTrackers")
-        event_manager = component.get("EventManager")
-        event_manager.deregister_event_handler("TorrentAddedEvent", self.on_torrent_added_event)
+        component.get("EventManager").deregister_event_handler("TorrentAddedEvent", self.on_torrent_added_event)
+
 
     def update(self):
         pass
@@ -94,7 +87,6 @@ class Core(CorePluginBase):
     def on_torrent_added_event(self,torrent_id, *arg):
         log.info("MoarTrackers: on_torrent_added_event (torrent_id=%s)" % torrent_id)
         try:
-            #log.info("torrent_id: %d" % torrent_id)
             torrent = component.get("TorrentManager").torrents[torrent_id]
             data = torrent.get_status(["name","is_finished"])
             log.info(data)
@@ -117,6 +109,3 @@ class Core(CorePluginBase):
 
         except Exception as e:
             log.info(e.strerror)
-
-
-   
