@@ -44,7 +44,9 @@ from HTMLParser import HTMLParser
 import urllib2
 
 
-"""Parses torrentz.eu to find the announcelist"""
+"""Parses torrentz.eu to find the announcelist
+The announcelist url is not simply /announcelist_[hash]. It looks
+like some arbitrary number."""
 class TorrentzHTMLParser(HTMLParser):
 
     def __init__(self):
@@ -57,6 +59,7 @@ class TorrentzHTMLParser(HTMLParser):
             for name, value in attrs:
                 if name == 'href':
                     if 'announcelist' in value:
+                        log.info(value)
                         self.announcelist_url = self.announcelist_url + value
                         log.info("Found announcelist: %s" % self.announcelist_url)
 
@@ -92,11 +95,15 @@ class Core(CorePluginBase):
             log.info(data)
 
             if not data["is_finished"]:
-                response = urllib2.urlopen("http://torrentz.eu/%s" % torrent_id)
+                req = urllib2.Request("http://torrentz.eu/%s" % torrent_id)
+                req.add_header('User-agent', 'Mozilla 5.10')
+                response = urllib2.urlopen(req)
                 htmlParser = TorrentzHTMLParser()
                 htmlParser.feed(response.read())
-                
-                tracker_page = urllib2.urlopen(htmlParser.get_announcelist_url()).read()
+
+                req = urllib2.Request(htmlParser.get_announcelist_url())
+                req.add_header('User-agent', 'Mozilla 5.10')
+                tracker_page = urllib2.urlopen(req).read()
                 trackers = tracker_page.split()
                 tracker_list = []
                 for t in trackers:
@@ -105,7 +112,7 @@ class Core(CorePluginBase):
                     tracker_list.append(tracker_dict)
                 log.info(tracker_list)
 
+                # set_trackers expects a list [{"tier":0, "url":"dfsbdfsnh.com"}...]
                 torrent.set_trackers(tracker_list)
-
         except Exception as e:
             log.info(e.strerror)
